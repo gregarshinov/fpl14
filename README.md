@@ -8,7 +8,7 @@
 
 Arshinov, 9
 
-Efimova, 0
+Efimova, 7
 
 Ilyukhina, 9
 
