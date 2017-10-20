@@ -1,0 +1,142 @@
+import numpy as np
+import os
+from random import shuffle
+import re
+
+from bokeh.models import ColumnDataSource, LabelSet
+from bokeh.plotting import figure, show, output_file
+from bokeh.io import output_notebook
+output_notebook()
+
+
+import urllib.request
+import zipfile
+#from lxml import etree
+import lxml.etree
+
+if not os.path.isfile('ted_en-20160408.zip'):
+    urllib.request.urlretrieve("https://wit3.fbk.eu/get.php?path=XML_releases/xml/ted_en-20160408.zip&filename=ted_en-20160408.zip", filename="ted_en-20160408.zip")
+    
+with zipfile.ZipFile('ted_en-20160408.zip', 'r') as z:
+    doc = lxml.etree.parse(z.open('ted_en-20160408.xml', 'r'))
+input_text = '\n'.join(doc.xpath('//content/text()'))
+del doc
+
+i = input_text.find("Hyowon Gweon: See this?")
+input_text[i-20:i+150]
+
+input_text_noparens = re.sub(r'\([^)]*\)', '', input_text)
+sentences_strings_ted = []
+for line in input_text_noparens.split('\n'):
+    m = re.match(r'^(?:(?P<precolon>[^:]{,20}):)?(?P<postcolon>.*)$', line)
+    sentences_strings_ted.extend(sent for sent in m.groupdict()['postcolon'].split('.') if sent)
+
+# view the first few:
+sentences_strings_ted[:5]
+
+sentences_ted = []
+for sent_str in sentences_strings_ted:
+    tokens = re.sub(r"[^a-z0-9]+", " ", sent_str.lower()).split()
+    sentences_ted.append(tokens)
+len(sentences_ted)
+print(sentences_ted[0])
+print(sentences_ted[1])
+import collections
+c=collections.Counter()
+for s in sentences_ted:
+    for word in s:
+        c[word]+=1
+words_top_ted=list(k[0] for k in c.most_common(1000))
+counts_ted_top1000=list(k[1] for k in c.most_common(1000))
+
+hist, edges = np.histogram(counts_ted_top1000, density=True, bins=100, normed=True)
+
+p = figure(tools="pan,wheel_zoom,reset,save",
+           toolbar_location="above",
+           title="Top-1000 words distribution")
+p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="#555555")
+show(p)
+from gensim.models import Word2Vec
+
+ted_model = Word2Vec(sentences_ted, size=100, window=5, min_count=5, workers=4)
+ted_model.save('ted_model')
+ted_model=Word2Vec.load('ted_model')
+ted_model.most_similar("man")
+ted_model.most_similar("computer")
+ted_model.most_similar('house')
+words_top_vec_ted = model_ted[words_top_ted]
+from sklearn.manifold import TSNE
+tsne = TSNE(n_components=2, random_state=0)
+words_top_ted_tsne = tsne.fit_transform(words_top_vec_ted)
+p = figure(tools="pan,wheel_zoom,reset,save",
+           toolbar_location="above",
+           title="word2vec T-SNE for most common words")
+source = ColumnDataSource(data=dict(x1=words_top_ted_tsne[:,0],
+                                    x2=words_top_ted_tsne[:,1],
+                                    names=words_top_ted))
+p.scatter(x="x1", y="x2", size=8, source=source)
+labels = LabelSet(x="x1", y="x2", text="names", y_offset=6,
+                  text_font_size="8pt", text_color="#555555",
+                  source=source, text_align='center')
+p.add_layout(labels)
+show(p)
+
+if not os.path.isfile('wikitext-103-raw-v1.zip'):
+    urllib.request.urlretrieve("https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-raw-v1.zip", filename="wikitext-103-raw-v1.zip")
+with zipfile.ZipFile('wikitext-103-raw-v1.zip', 'r') as z:
+    input_text = str(z.open('wikitext-103-raw/wiki.train.raw', 'r').read(), encoding='utf-8')
+sentences_wiki = []
+for line in input_text.split('\n'):
+    s = [x for x in line.split('.') if x and len(x.split()) >= 5]
+    sentences_wiki.extend(s)
+for s_i in range(len(sentences_wiki)):
+    sentences_wiki[s_i] = re.sub("[^a-z]", " ", sentences_wiki[s_i].lower())
+    sentences_wiki[s_i] = re.sub(r'\([^)]*\)', '', sentences_wiki[s_i])
+del input_text
+shuffle(sentences_wiki)
+print(len(sentences_wiki))
+sentences_wiki = sentences_wiki[:int(len(sentences_wiki)/5)]
+print(len(sentences_wiki))
+
+
+import collections
+c=collections.Counter()
+for s in sentences_ted:
+    for word in s:
+        c[word]+=1
+#print (c.most_common(1000))
+words_top_ted=list(k[0] for k in c.most_common(1000))
+counts_wiki_top1000=list(k[1] for k in c.most_common(1000))
+hist, edges = np.histogram(counts_wiki_top1000, density=True, bins=100, normed=True)
+
+p = figure(tools="pan,wheel_zoom,reset,save",
+           toolbar_location="above",
+           title="Top-1000 words distribution")
+p.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], line_color="#555555")
+show(p)
+wiki_model = Word2Vec(sentences_wiki, size=100, window=5, min_count=5, workers=4)
+wiki_model.save('wiki_model')
+wiki_model=Word2Vec.load('wiki_model')
+wiki_model.most_similar("man")
+wiki_model.most_similar("computer")
+wiki_model.most_similar("house")
+
+words_top_vec_wiki = wiki_model[words_top_wiki]
+tsne = TSNE(n_components=2, random_state=0)
+words_top_wiki_tsne = tsne.fit_transform(words_top_vec_wiki)
+
+p = figure(tools="pan,wheel_zoom,reset,save",
+           toolbar_location="above",
+           title="word2vec T-SNE for most common words")
+
+source = ColumnDataSource(data=dict(x1=words_top_wiki_tsne[:,0],
+                                    x2=words_top_wiki_tsne[:,1],
+                                    names=words_top_wiki))
+
+p.scatter(x="x1", y="x2", size=8, source=source)
+
+labels = LabelSet(x="x1", y="x2", text="names", y_offset=6,
+                  text_font_size="8pt", text_color="#555555",
+                  source=source, text_align='center')
+p.add_layout(labels)
+show(p)
