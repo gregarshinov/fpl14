@@ -42,4 +42,5 @@ Sorokin, 9
 
 Sinitsyna, 9
 
-Sviridyuk, 0
+Sviridyuk, 7
+
